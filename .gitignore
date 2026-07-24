@@ -1,2 +1,5 @@
 figures.pptx
 sweden_df.parquet
+.DS_Store
+.ipynb_checkpoints/
+*.rtf
