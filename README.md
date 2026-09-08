@@ -1,3 +1,12 @@
+![License](https://img.shields.io/github/license/nalpako2027/mice_imputation_diagnostics_helper?style=for-the-badge)
+![Last Commit](https://img.shields.io/github/last-commit/nalpako2027/mice_imputation_diagnostics_helper?style=for-the-badge)
+![Python](https://img.shields.io/badge/python-%233670A0.svg?style=for-the-badge&logo=python&logoColor=ffdd54)
+![Pandas](https://img.shields.io/badge/Pandas-150458?style=for-the-badge&logo=pandas&logoColor=white)
+![NumPy](https://img.shields.io/badge/NumPy-013243?style=for-the-badge&logo=numpy&logoColor=white)
+![Git](https://img.shields.io/badge/git-%23F05033.svg?style=for-the-badge&logo=git&logoColor=white)
+![Version](https://img.shields.io/badge/version-1.0.0-blue)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/orhan-kaplan-phd-5a4a84212/)
+
 # 📊🔍 A Diagnostics Package for Multiple Imputation by Chained Equations (using PMM)
   
 A from-scratch, `sklearn`-only implementation of Multiple Imputation by Chained Equations (MICE) with Predictive Mean Matching (PMM) based on the K-Nearest Neighbours (*K*-NN) donor selection mechanism, built for complex-survey data (e.g. TIMSS, PISA) where off-the-shelf imputation packages fall short. This engine bridges that fragmentation gap, runnning MICE imputations and computing a comprehensive Rubin's (1987) Diagnostics Matrix containing the Relative Variance Increase (RVI), Fraction of Missing Information (FMI), and Relative Efficiency (RE) alongside Von Hippel’s (2020) Two-Stage Quadratic Sufficiency Metric to calculate minimum number of imputation for reproducible standard errors.
@@ -220,7 +229,8 @@ This repo's diagnostics are meant to be read together, not individually — each
 
 ## License
 
-*MIT*
+![License](https://img.shields.io/github/license/nalpako2027/mice_imputation_diagnostics_helper?style=for-the-badge)
+
 
 # Attribution
 
