@@ -1,6 +1,6 @@
 ![License](https://img.shields.io/github/license/nalpako2027/mice_imputation_diagnostics_helper?style=for-the-badge)
 ![Last Commit](https://img.shields.io/github/last-commit/nalpako2027/mice_imputation_diagnostics_helper?style=for-the-badge)
-![Coverage](https://img.shields.io/codecov/c/github/nalpako2027/mice_imputation_diagnostics_helper?style=for-the-badge)
+![CodeCov](https://img.shields.io/badge/codecov-%23ff0077.svg?style=for-the-badge&logo=codecov&logoColor=white)
 ![Python](https://img.shields.io/badge/python-%233670A0.svg?style=for-the-badge&logo=python&logoColor=ffdd54)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/orhan-kaplan-phd-5a4a84212/)  
 ![Version](https://img.shields.io/badge/version-1.0.0-blue)
