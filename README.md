@@ -215,8 +215,9 @@ This repo's diagnostics are meant to be read together, not individually — each
 
 
 
-### 📚 References  
+### 📚 References   
 
+*   Efron, B., & Tibshirani, R. J. (1993). *An Introduction to the Bootstrap*. Chapman & Hall.
 *   Guenther, P., Guenther, M., Ringle, C. M., Zaefarian, G., & Cartwright, S. (2023). Improving PLS-SEM use for business marketing research. *Industrial Marketing Management, 111*, 127–142. https://doi.org/10.1016/j.indmarman.2023.03.010
 *   Rubin, D. B. (1987). *Multiple imputation for nonresponse in surveys*. John Wiley & Sons. 
 *   Stavseth, M. R., Clausen, T., & Røislien, J. (2019). How handling missing data may impact conclusions: A comparison of six different imputation methods for categorical questionnaire data. *SAGE Open Medicine, 7*, 2050312118822912. https://doi.org/10.1177/2050312118822912
