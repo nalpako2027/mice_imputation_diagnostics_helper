@@ -5,13 +5,21 @@
 ![Version](https://img.shields.io/badge/Version-1.0.0-orange) 
 
 # 📊🔍 A Diagnostics Package for Multiple Imputation by Chained Equations (using PMM)
-  
-A from-scratch, `sklearn`-only implementation of Multiple Imputation by Chained Equations (MICE) with Predictive Mean Matching (PMM) based on the K-Nearest Neighbours (*K*-NN) donor selection mechanism, built for complex-survey data (e.g. TIMSS, PISA) where off-the-shelf imputation packages fall short. This engine bridges that fragmentation gap, runnning MICE imputations and computing a comprehensive Rubin's (1987) Diagnostics Matrix containing the Relative Variance Increase (RVI), Fraction of Missing Information (FMI), and Relative Efficiency (RE) alongside Von Hippel’s (2020) Two-Stage Quadratic Sufficiency Metric to calculate minimum number of imputation for reproducible standard errors.
+# Under Construction!!!
+
+## 1. 📝 Summary
+A from-scratch, `scikit-learn`-only implementation of Multiple Imputation by Chained Equations (MICE) with Predictive Mean Matching (PMM) based on *K*-nearest-neighbour (*K*-NN) donor selection, built for complex-survey data such as TIMSS and PISA. It runs the imputations and returns Rubin's (1987) pooling diagnostics (RVI, FMI, RE) and Von Hippel's (2020) recommended number of imputations, so that you can verify that your imputed results are stable and reproducible.
 
 
+## 2. 🎯 Objectives
 
-## 📈 💼 The Scientific and Business Implications and Hidden Risks of Default Analytics  
-In both corporate data departments and academic institutions, listwise deletion (completely dropping any row with at least one missing cell for any variable used) remains the most common default method for handling incomplete datasets (Guenther et al., 2023; Stavseth et al., 2019). A recent peer-reviewed article found that, since 2017, 33.1% of data anlaysts in business marketing research performed listwise deletion and only 0.8% used imputation (Guenther et al., 2023). Whilst data teams frequently utilise this approach due to its expeditious and straightforward nature, the blind dropping of valuable data engenders considerable risk with regard to operational decision-making, strategic investments, and especially the validity of the results (internal validity, external validity and statistical conclusion validity). 
+### Why: the case for principled imputation
+
+In corporate data teams and academic research alike, listwise deletion (dropping every row that has at least one missing value in the variables used) remains the most common default for incomplete data (Guenther et al., 2023; Stavseth et al., 2019). Guenther et al. (2023) found that, since 2017, 33.1% of data analysts in business marketing research used listwise deletion and only 0.8% used imputation. Listwise deletion is quick and simple, but it puts internal, external and statistical conclusion validity at risk:  
+
+- **Lost statistical power and signal.** Dropping rows can shrink the sample substantially. If a customer skips one optional profile question, listwise deletion removes their entire purchase and behavioral history from the model; in a survey, a student who skips one item loses their whole record.
+- **Selection bias.** Data are seldom missing completely at random. If particular groups (e.g., lower-income customers, historically underrepresented groups, specific regions) skip questionnaire items more often, listwise deletion **without a valid theoretical and methodological rationale** systematically removes those groups, and the resulting models reflect only respondents who complete every item.
+- **Wasted data acquisit ion costs.** Surveys, marketing pipelines and international assessment waves (e.g., TIMSS) require substantial investment, and discarding partially complete records throws away part of that investment.
 
 The implementation of a robust MICE framework such as this engine for dealing with missing values is imperative for businesses and research for three reasons:  
 1. **Destruction of Statistical Power and Revenue Signal:** The elimination of rows in an aggressive manner can result in a substantial reduction of the sample size. For an enterprise, this necessitates the discarding of valuable consumer or product tracking data. In the event that a customer elects to bypass a question pertaining to optional profiles, the consequence of listwise deletion is the eradication of their complete purchase and behavioural history from the predictive model, a development which has the potential to compromise the statistical power of the model and relevant inferences.
