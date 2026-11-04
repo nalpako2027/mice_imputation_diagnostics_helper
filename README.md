@@ -17,150 +17,71 @@ A from-scratch, `scikit-learn`-only implementation of Multiple Imputation by Cha
 
 In corporate data teams and academic research alike, listwise deletion (dropping every row that has at least one missing value in the variables used) remains the most common default for incomplete data (Guenther et al., 2023; Stavseth et al., 2019). Guenther et al. (2023) found that, since 2017, 33.1% of data analysts in business marketing research used listwise deletion and only 0.8% used imputation. Listwise deletion is quick and simple, but it puts internal, external and statistical conclusion validity at risk:  
 
-- **Lost statistical power and signal.** Dropping rows can shrink the sample substantially. If a customer skips one optional profile question, listwise deletion removes their entire purchase and behavioral history from the model; in a survey, a student who skips one item loses their whole record.
-- **Selection bias.** Data are seldom missing completely at random. If particular groups (e.g., lower-income customers, historically underrepresented groups, specific regions) skip questionnaire items more often, listwise deletion **without a valid theoretical and methodological rationale** systematically removes those groups, and the resulting models reflect only respondents who complete every item.
-- **Wasted data acquisit ion costs.** Surveys, marketing pipelines and international assessment waves (e.g., TIMSS) require substantial investment, and discarding partially complete records throws away part of that investment.
-
-The implementation of a robust MICE framework such as this engine for dealing with missing values is imperative for businesses and research for three reasons:  
-1. **Destruction of Statistical Power and Revenue Signal:** The elimination of rows in an aggressive manner can result in a substantial reduction of the sample size. For an enterprise, this necessitates the discarding of valuable consumer or product tracking data. In the event that a customer elects to bypass a question pertaining to optional profiles, the consequence of listwise deletion is the eradication of their complete purchase and behavioural history from the predictive model, a development which has the potential to compromise the statistical power of the model and relevant inferences.
-2. **The Danger of Selection Bias:** Generally, data is seldom missing completely at random. In instances where lower-income customers (or historically underrepresented groups) or specific regions exhibit a higher propensity to skip questionnaire columns, listwise deletion **without a valid theoretical and methodological rationale** systematically deletes those entire demographics from the database. Consequently, predictive/causal models will optimise exclusively for the subset of users who complete every form, resulting in algorithms that are significantly biased and consequently fail to capitalise on substantial problems/opportunities by failing to accurately represent reality in the real world.
-3. **Wasted Data Acquisition Costs:** The procurement of data through user surveys, marketing pipelines, or panel research (e.g. international TIMSS waves) necessitates a substantial financial investment. The practice of listwise deletion in data science entails the deliberate discarding of 10% to 30% of a paid-for dataset, primarily due to the absence of robust mathematical infrastructure necessary for the secure imputation of missing data elements.
-
-### 🎯 Why Choose MICE with Predictive Mean Matching (PMM)?  
-Predictive Mean Matching (PMM) is highly recommended for this pipeline because it preserves the natural boundaries and structural integrity of the data. Unlike regular linear regression, which requires multivariate normality and frequently imputes unrealistic values (such as negative numbers or decimals for categorical items), PMM ensures that every imputed value is copied directly from a real, observed respondent (donor).This approach provides three critical advantages for large-scale assessments:  
-- Preserves Scale Boundaries: It restricts categorical items (like 1–4 Likert scales) to authentic, integer values.
-- Maintains Non-Linear Relationships: It handles skewed variables without requiring complex data transformations.
-- Captures Real Variance: It avoids over-smoothing by injecting realistic, empirical noise through a randomized *k*-nearest-neighbor donor selection, ensuring your downstream standard errors and variance components are not artificially deflated.
+- **Lost statistical power and signal.** Dropping rows removes valuable data and can shrink the sample substantially. If a customer skips one optional profile question, listwise deletion removes their entire purchase and behavioral history from the model; in a survey, a student who skips one item loses their whole record.
+- **Selection bias.** Data are seldom missing completely at random. If particular groups (e.g., lower-income customers, historically underrepresented groups, specific regions) skip questionnaire items more often, listwise deletion **without a valid theoretical and methodological rationale** systematically removes those groups, and the resulting models reflect only respondents who complete every item. This reduces generalizability of the results by failing to accurately represent reality.
+- **Wasted data acquisition costs.** Surveys, marketing pipelines and international assessment waves (e.g., TIMSS) require substantial investment, and discarding partially complete records throws away part of that investment in the absence of robust mathematical infrastructure necessary for the secure imputation of missing data elements.
 
 
-## The problem
-
-Multiply imputing survey constructs for a complex-sample dataset like TIMSS has three requirements that general-purpose Python imputation libraries don't jointly satisfy:
-
-1. **Auditable PMM matching.** R's `mice` package defaults to an asymmetric PMM matching rule (`matchtype = 1`): the donor pool's predicted values use the non-stochastic OLS point estimate (`beta_hat`), while the recipient's predicted value uses a stochastic Bayesian posterior draw (`beta_star`). This is a documented, user-facing parameter in `mice` and mirrors Stata's `mi impute pmm` default. Python alternatives either don't expose this choice at all, or require reading undocumented source code to confirm what they actually do — which is a poor foundation for a method used in a peer-reviewed manuscript.
-2. **Pooling diagnostics beyond point estimates.** Deciding *how many* imputations to run, and confirming the imputation model is behaving well, requires Rubin's Rules quantities (fraction of missing information, relative increase in variance, relative efficiency) and Von Hippel's (2020) two-stage recommended-*M* calculation. Most Python MICE wrappers pool parameter estimates but stop short of these diagnostics.
-3. **Complex-survey compatibility.** TIMSS-style data comes with sampling weights and jackknife repeated replication (JRR) variance structures. General-purpose imputers have no concept of a design weight at any level, and — because they're built as fixed `scikit-learn`-style pipelines — offer no natural place to keep weights, replicate weight columns, and other design metadata untouched and attached to each completed dataset.
-
-Existing options were evaluated and rejected on these grounds specifically. `autoimpute` (Kearney & Barkat, 2019), for example, has no weight argument anywhere in its `MiceImputer` or `PMMImputer` classes, does not expose the FMI/RVI/recommended-*M* diagnostics used here, and does not expose iteration-level convergence state (only the final completed dataset per chain).
-
-## The solution
-
-`mice_and_diagnostics()` implements the full pipeline as a single, readable, dependency-light function:
-
-- **Imputation model**: Bayesian linear regression under a noninformative prior, following Rubin (1987, p. 167) and van Buuren (2018, Sec. 3.2, *Flexible Imputation of Missing Data*, 2nd ed.) — a $\chi^2$ draw for $\dot\sigma^2$, then a multivariate normal draw for $\dot\beta$.
-- **PMM donor matching**: Implements `mice`'s default Type 1 matching explicitly — donor-pool predictions use `beta_hat`, recipient predictions use the stochastic `beta_star` draw — matched via k-nearest-neighbors on the predicted-mean scale, with the donated value always a real, previously observed value (not a regression prediction).
-- **Fully conditional specification (FCS)**: Cycles through all incomplete variables for a configurable number of burn-in iterations, with per-variable predictor lists optionally customized via `predictor_map`.
-- **Independent parallel chains**: Each of the `m_datasets` imputations is generated from its own independent RNG stream (via `numpy`'s `SeedSequence.spawn`), as required for Rubin's Rules.
-- **Pooling diagnostics**: Computes pooled parameter estimates, within-imputation varaiance, between-imputation variance, total variance to calculate relative increase in variance (RVI), fraction of missing information (FMI), relative efficiency (RE), and Von Hippel's (2020) recommended number of imputations.
-- **Convergence and plausibility diagnostics**: Markov Chain Monte Carlo (MCMC)-style trace plots of each imputed variable's mean across burn-in cycles and chains, plus observed-vs-imputed KDE density overlays.
-- **Survey-weighted margins**: Reports population-weighted means before and after imputation (Rubin's grand average across the pooled datasets), using a user-specified design weight column.
-- **Design-weight caveat, stated explicitly**: Survey weights are used only for the before/after weighted margins reported at the end — they are not incorporated into the imputation regressions themselves, matching the unweighted default behavior of R's `mice` and Stata's `mi impute pmm`. The function is written so that a case-weighted regression or a weight-based auxiliary predictor could be added directly to the OLS step if a given analysis calls for it (see Reiter, Raghunathan, & Kinney, 2006, on the risks of omitting design features from the imputation model; and Bouhlila & Sellaouti, 2013, who weighted each observation in their own TIMSS MICE application).
-
-A sample application is performed on the longitudinal TIMSS 2023-L wide format panel dataset (Sweden's data) for representation. An illustrative approach to a problem is also analyzed and discusssed in the notebook. 
+### What: technical goals
 
 
-## ⚙️🛠️ Algorithmic Workflow & Methodology  
-The multiple imputation engine treats missing data under a Missing at Random (MAR) structural assumption, executing an iterative chain of conditional univariate models on a variable-by-variable vasis (van Buuren \& Groothuis-Oudshoorn, 2011). Adopting van Buuren and Groothuis-Oudshoorn's (2011) steps of imputation, analysis and pooling, the current engine processes the data using a three-stage pipeline:
+Multiply imputing survey constructs for a complex-sample dataset such as TIMSS has three requirements that general-purpose Python imputation libraries do not jointly satisfy. This package is built to meet all three:
 
-The structural workflow of the **MICE imputation engine (`mice_and_diagnostics()`)**:  
+1. **Auditable PMM matching.** R's `mice` defaults to an asymmetric matching rule (`matchtype = 1`): donor-pool predictions use the non-stochastic OLS estimate (`beta_hat`), while the recipient's prediction uses a stochastic Bayesian posterior draw (`beta_star`). This is a documented parameter in `mice` and mirrors Stata's `mi impute pmm` default. Python alternatives either do not expose this choice or require reading undocumented source code to confirm what they do, which is a poor foundation for a method used in a study.
+2. **Pooling diagnostics beyond point estimates.** Deciding *how many* imputations to run, and confirming that the imputation model behaves well, requires Rubin's Rules quantities (fraction of missing information, relative increase in variance, relative efficiency) and Von Hippel's (2020) two-stage recommended-*M* calculation. Most Python MICE wrappers pool parameter estimates but stop short of these diagnostics.
+3. **Complex-survey compatibility.** TIMSS-style data come with sampling weights and jackknife repeated replication (JRR) variance structures. General-purpose imputers have no concept of a design weight and, because they are built as fixed `scikit-learn`-style pipelines, offer no natural place to keep weights, replicate-weight columns and other design metadata untouched and attached to each completed dataset.
 
-<img width="1080" height="608" alt="Slide1" src="https://github.com/user-attachments/assets/6dfd2123-6531-48b6-b1d4-20334e1f04fe" />
-
-
-### Stage 1: Stochastic Initialization 
-To begin the chain, missing parameters cannot remain empty. The function executes an unconditional random draw directly from the observed margins of the target variables, represented by the data matrix of $Y = (Y_{1}, \dots , Y_{n})$ for $n = (1, \dots , n)$ number of variables with missing values, with every observed values having an equal chance of being selected (i.e., uniformly distributed possibilities). For the iteration 0 (the baseline initialization stage) this can be shown as:    
+Existing options were evaluated against these requirements. For example, `autoimpute` (Kearney & Barkat, 2019) has no weight argument in its `MiceImputer` or `PMMImputer` classes, does not expose the FMI/RVI/recommended-*M* diagnostics used here, and does not expose iteration-level convergence state (only the final completed dataset per chain).
 
 
-$${\large Y_{mis,i}^{(0)} \sim \text{Uniform}(Y_{obs})}$$
+## 3. 📂 Dataset
+
+A sample application is run on the longitudinal **TIMSS 2023-L** wide-format panel dataset (Sweden's data). **[UPDATE: fill in the items below]**
+
+- **Source:** **[UPDATE: IEA, TIMSS 2023 (longitudinal), with the full citation and a link to the data access page]**
+- **Size:** **[UPDATE: number of students and number of variables]**
+- **Subsetting before imputation:** **[UPDATE: any filtering, e.g. country, cohort, cases with missing weights]**
+- **Variables imputed and auxiliary variables:** **[UPDATE: see Table 1 below]**
+
+> **📋 Table 1 (to add):** Variables used in the sample application.
+>
+> | Variable | Description | Role (imputed / auxiliary) | Scale | % missing |
+> |---|---|---|---|---|
+> | **[UPDATE]** | | | | |
 
 
-This approach preserves the baseline range and data type boundaries of continuous, ordinal and nominal scales before modeling begins.
 
+## 4. 🔧 Methodology
 
-### Stage 2: Chained Regression & Predictive Mean Matching  
-For each iteration $t \in {1, \dots, \text{burn\-in}}$ (where burn-in is the number of initial cycles the algorithm runs until the simulation is stabilized through statistical convergence, removing the noise introduced by the initial random guesses) and each target variable $Y_{j}$, all other columns $X$ (including completely observed covariates or auxiliary variables) act as predictors $X_{-j}$.  
+The package treats missing data under a Missing at Random (MAR) assumption and follows van Buuren and Groothuis-Oudshoorn's (2011) three steps of imputation, analysis and pooling. The full derivations, formulas and worked examples are in the notebook: **`mice_imputation_diagnostics_helper.ipynb`**. In short, `mice_and_diagnostics()` does the following:
 
-The imputations is dynamically performed through these steps:  
+1. **Stochastic initialization.** Each missing cell is filled with a random draw from the observed values of that variable, which keeps the initial values inside the range and data type of the original scale.
+2. **Fully conditional specification (FCS).** For a configurable number of burn-in iterations, the function cycles through every incomplete variable. All other columns, including fully observed auxiliary variables, act as predictors (customizable per variable through `predictor_map`).
+3. **Bayesian linear regression and PMM donor matching.** For each variable, the model is fitted on the rows where the variable was originally observed, using a non-informative prior (Rubin, 1987, p. 167; van Buuren, 2018, Sec. 3.2): a χ² draw for the residual variance, then a multivariate normal draw for the coefficients. Following `mice`'s Type 1 matching, donor-pool predictions use `beta_hat` and recipient predictions use the stochastic `beta_star`. Each recipient is matched to its *K* nearest donors on the predicted-mean scale (default *K* = 5), one donor is selected at random, and the donor's **real, observed value** is imputed.
+4. **Independent parallel chains.** Each of the `m_datasets` imputations is generated from its own independent RNG stream (`numpy`'s `SeedSequence.spawn`), as Rubin's Rules require.
+5. **Pooling diagnostics.** Rubin's Rules give the pooled estimate, within-imputation variance, between-imputation variance and total variance, from which the package reports RVI, FMI and RE, plus Von Hippel's (2020) recommended *M* for each imputed variable.
+6. **Convergence and plausibility checks.** Trace plots of the mean (and standard deviation) of each imputed variable across burn-in cycles and chains, plus observed-versus-imputed KDE overlays.
+7. **Survey-weighted margins.** Population-weighted means before and after imputation, using a user-specified design-weight column.
 
-1.	OLS Parameter Estimation: An ordinary least squares regression is fitted strictly on the rows where the target variable was originally present:
+> **🖼️ Figure 1:** The structural workflow of the MICE imputation engine (`mice_and_diagnostics()`).
+>
+> <img width="1080" height="608" alt="Slide1" src="https://github.com/user-attachments/assets/6dfd2123-6531-48b6-b1d4-20334e1f04fe" />
 
-$$
-\hat{\beta}^{(t)} = (X_{obs}^{T} X_{obs})^{-1} X_{obs}^{T} Y_{obs}
-$$
-  
-2.	Linear Metric Projections: Expected values are predicted for both the observed donor pool and missing rows at iteration *t*:
+### 🎯 Why PMM?
 
+PMM preserves the natural boundaries and structure of the data. Unlike regular linear-regression imputation, which assumes multivariate normality and can produce unrealistic values (such as negative numbers, or decimals for categorical items), PMM copies every imputed value from a real, observed respondent (donor). This has three advantages for large-scale assessments:
 
-$$
-\hat{Y}_{obs} = X_{obs} \hat{\beta}^{(t)} \quad \text{and} \quad \hat{Y}_{mis} = X_{mis} \hat{\beta}^{(t)}
-$$
+- **Preserves scale boundaries:** categorical items (such as 1–4 Likert scales) stay within authentic, integer values.
+- **Maintains non-linear relationships:** skewed variables can be handled without complex transformations.
+- **Captures real variance:** randomised *K*-NN donor selection injects realistic, empirical noise, so downstream standard errors and variance components are not artificially deflated.
 
-3.	$K$-NN Donor Pooling: For each missing row vector \(i\), a distance metric is established across the projected space to isolate the \(K=5\) closest observed donors:
+### 🔢 Choosing the number of imputations
 
-$$
-d\left(\hat{y}_{mis,i}, \hat{y}_{obs,j}\right) = \left|\hat{y}_{mis,i} - \hat{y}_{obs,j}\right|
-$$
+Von Hippel (2020) recommends a two-stage procedure: run a pilot imputation (e.g., *M* = 10), read the recommended *M* for each imputed variable from the diagnostics table, and then run the final imputation with at least the largest recommended *M*.
 
-4.	Stochastic Selection: One donor is selected at random from the 5 closest candidates, and their actual, raw observed value is mapped into the missing cell. This step avoids the artificial smoothing caused by linear mean imputations, maintaining the natural variance of the dataset.
+### ⚖️ Design-weight caveat
 
-
-### Missing Information Diagnostics Using Rubin's Rule (1987)
-
-Once $M$ independent completed datasets are generated using unique random seeds, their stability is evaluated across the structural margins using **Rubin's (1987) Rules**.
-
-Let $\hat{Q}_m$ be the sample mean of variable $Y$ in imputation $m$, and $W_m$ be its corresponding within-imputation sampling variance ($W_m = \sigma^2_m / M$), where *N* is the total number of rows.
-
-The **Pooled Parameter Estimate** ($\overline{Q}$) and **Within-Imputation Variance** ($\overline{W}$) are calculated as:
-
-$$\overline{Q} = \frac{1}{M}\sum_{m=1}^{M}\hat{Q}_m \quad \text{and} \quad \overline{W} = \frac{1}{M}\sum_{m=1}^{M}W_m$$
-
-#### Between-Imputation Variance ($B$) and Total Variance ($T$)
-
-The structural variation across the independent imputation streams represents the uncertainty added by the missing data points:
-
-$$B = \frac{1}{M-1}\sum_{m=1}^{M}(\hat{Q}_m - \overline{Q})^2$$  
-
-*Note: For single-variable scalar parameters like a column mean, the vector transpose inner product in Rubin (1987) simplifies mathematically to a standard squared difference because transposing a single number does not alter its dot product value.*
-
-The **Total Variance** ($T$) combines both sources of error, incorporating a finite-sample correction multiplier $(1 + 1/M)$:
-
-$$T = \overline{W} + \left(1 + \frac{1}{M}\right)B$$
-
-*   **Relative Variance Increase** ($RVI$) measures the proportional increase in variance due to non-response:
-
-$$\text{RVI} = \frac{\left(1+\frac{1}{M}\right)B}{\overline{W}}$$
-
-*   **Fraction of Missing Information** ($FMI$) measures the proportion of total uncertainty directly caused by the missing values, adjusted for finite sample degrees of freedom ($\nu_{m}$):
-
-$$\text{FMI} = \frac{\text{RVI}+\frac{2}{\nu_{m}+3}}{1+\text{RVI}} \quad \text{where} \quad \nu_{m}=(M-1)\left(1+\frac{1}{\text{RVI}}\right)^{2}$$
-
-
-#### Relative Efficiency ($RE$)
-
-**Relative Efficiency** replicates Stata's key verification check, tracking the stability of your current sample pool ($M$) relative to an infinite number of imputations ($M = \infty$):
-
-$$\text{RE} = \frac{1}{1+\frac{\text{FMI}}{M}}$$
-
-An $\text{RE}$ score exceeding $0.95$ (95% efficiency) is the standard benchmark for stable, publication-grade standard errors.
-
-
-#### How Many Imputations? Von Hippel’s Two-Stage Sufficiency Rule
-
-To determine if your choice of $M$ is sufficient, the engine calculates a **Recommended $M$** using Von Hippel's (2020) quadratic rule. The calculation of the M should be evaluated on a pilot imputation with 10 imputations. The final MICE should be performed based on the M that yield reproducible standard errors. To remain conservative, a logit transformation establishes the 95% upper confidence limit of the $\text{FMI}$ ($\gamma$):
-
-$$\text{logit}(\gamma_{\text{mis}}) = \text{logit}(\hat{\gamma}_{\text{mis}}) \pm z\sqrt{\frac{2}{M}}$$  
-
-Here z ($1.96$) represents the standard normal critical value for a 95% confidence interval. Given a target coefficient of variation tolerance of $\alpha = 0.05$, the structural sample size threshold is:
-
-$$M_{\text{recommended}} = \left\lceil 1+0.5\left(\frac{\gamma}{\alpha}\right)^{2}\right\rceil$$
-
-Recommended M's are calculated for each variable with missing value. To be on the safe side, the number of imputations should be--at least--equal to the largest `Recommended M`
-### 📉 Convergence Monitoring via MCMC Trace Plots  
-
-Because Multiple Imputation by Chained Equations (MICE) is structurally an iterative Markov Chain Monte Carlo (MCMC) algorithm, monitoring convergence is mandatory to ensure statistical validity (van Buuren & Groothuis-Oudshoorn, 2011). The Diagnostics Package generates iterative trace plots tracking the mean and standard deviation of imputed values across the full burn-in sequence for every parallel chain M. Healthy convergence is visually confirmed when the paths of the independent streams interweave randomly—resembling overlapping "fuzzy caterpillars"—which demonstrates that the arbitrary random noise from Stage 1 Initialization Y^{(0)} has been completely washed away.
-
-### 📊 Distributional Plausibility Diagnostics  
-To verify that the Predictive Mean Matching (PMM) donor selection mechanism is operating correctly, the package computes distributional plausibility diagnostics using kernel density estimation (KDE) overlays (van Buuren, 2018). This visualization isolates the subset of values generated by the *K*-nearest neighbors matching pool $knn=5$ and directly compares their probability distribution profile against the raw, observed records. A methodologically sound imputation requires the imputed distribution to mirror the bounds, peaks, and shapes of the valid data, providing empirical proof that the package has preserved the original data constraints without introducing mathematical distortion or out-of-bounds metrics.
+Survey weights are used **only** for the before/after weighted margins reported at the end. They are not incorporated into the imputation regressions, which matches the unweighted default of R's `mice` and Stata's `mi impute pmm`. The function is written so that a case-weighted regression or a weight-based auxiliary predictor could be added directly to the regression step if an analysis calls for it (see Reiter, Raghunathan, & Kinney, 2006, on the risks of omitting design features from the imputation model; and Bouhlila & Sellaouti, 2013, who weighted each observation in their own TIMSS MICE application).
 
 
 ### Caution with MICE  
