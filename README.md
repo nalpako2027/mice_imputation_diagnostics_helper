@@ -277,7 +277,6 @@ See `requirements.txt` for the full dependency list. To run the notebook you als
 
 ## 9. 🗂️ Project Structure
 
-**[UPDATE: replace with your actual file tree]**
 
 ```
 mice_imputation_diagnostics_helper/
@@ -286,8 +285,8 @@ mice_imputation_diagnostics_helper/
 ├── requirements.txt             # Dependency list
 ├── mice_diagnostics.py          # mice_and_diagnostics() implementation
 ├── notebooks/
-│   └── <notebook_name>.ipynb    # Methodology, derivations and the TIMSS 2023-L sample application
-└── <images or assets folder>    # Figures used in the README
+│   └── mice_imputation_diagnostics_helper.ipynb  
+└── images    # Figures used in the README
 ```
 
 
