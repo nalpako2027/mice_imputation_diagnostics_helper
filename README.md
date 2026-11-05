@@ -36,18 +36,25 @@ Existing options were evaluated against these requirements. For example, `autoim
 
 ## 3. 📂 Dataset
 
-A sample application is run on the longitudinal **TIMSS 2023-L** wide-format panel dataset (Sweden's data). **[UPDATE: fill in the items below]**
+The sample application uses the longitudinal TIMSS 2023-L wide-format panel dataset (Sweden’s data), published by the IEA (Fishbein et al., 2026). The file contains 5,303 students and 1,155 variables. Seven survey constructs are imputed, with two auxiliary predictors (Table 1).
 
-- **Source:** **[UPDATE: IEA, TIMSS 2023 (longitudinal), with the full citation and a link to the data access page]**
-- **Size:** **[UPDATE: number of students and number of variables]**
-- **Subsetting before imputation:** **[UPDATE: any filtering, e.g. country, cohort, cases with missing weights]**
-- **Variables imputed and auxiliary variables:** **[UPDATE: see Table 1 below]**
+- **Source:** Fishbein, B., Taneva, M., & Kowolik, K. (2026). TIMSS 2023 Longitudinal User Guide for International Database. Boston College, TIMSS & PIRLS International Study Center. https://timss2023.org/longitudinal/data
+- **Size:** 5,303 students and 1,155 variables
+- **Variables imputed and auxiliary variables:**  see Table 1 below
 
-> **📋 Table 1 (to add):** Variables used in the sample application.
+> **📋 Table 1:** Variables used in the sample application (percentages of missing values are computed before imputation).
 >
-> | Variable | Description | Role (imputed / auxiliary) | Scale | % missing |
-> |---|---|---|---|---|
-> | **[UPDATE]** | | | | |
+> | Construct | Description | Role | Scale (observed range) | % missing 2023 | % missing 2024 |
+> |---|---|---|---|---|---|
+> | `ses` | Socioeconomic status | Imputed | Scale score (4.30–13.53) | 7.1 | 14.0 |
+> | `mathshortage` | Shortage affecting mathematics instruction | Imputed | Scale score (7.28–14.33) | 2.4 | 3.4 |
+> | `schemphsuccess` | School emphasis on academic success | Imputed | Scale score (5.85–16.30) | 2.4 | 4.4 |
+> | `digseff` | Digital self-efficacy | Imputed | Scale score (2.60–12.75) | 9.8 | 16.0 |
+> | `stud_expect` | Student's educational expectations | Imputed | Ordinal (1–6) | 8.8 | 15.5 |
+> | `confidentmath` | Student confidence in mathematics | Imputed | Scale score (4.42–15.59) | 13.7 | 20.3 |
+> | `instrclarity` | Clarity of mathematics instruction | Imputed | Scale score (4.57–12.49) | 12.7 | 18.6 |
+> | `math1` | Mathematics achievement score | Auxiliary | Achievement score (2023: 65.07–805.05; 2024: 201.60–890.71) | 0.0 | 0.0 |
+> | `school_math_mean` | School mean of `math1`, computed by `IDSCHOOL` | Auxiliary | Derived (2023: 416.51–610.43; 2024: 421.03–643.32) | 0.0 | 0.0 |
 
 
 
@@ -147,6 +154,7 @@ This repo's diagnostics are meant to be read together, not individually — each
 ### 📚 References   
 
 *   Efron, B., & Tibshirani, R. J. (1993). *An Introduction to the Bootstrap*. Chapman & Hall.
+*   Fishbein, B., Taneva, M., & Kowolik, K. (2026). TIMSS 2023 Longitudinal User Guide for International Database. Boston College, TIMSS & PIRLS International Study Center. https://timss2023.org/longitudinal/data
 *   Guenther, P., Guenther, M., Ringle, C. M., Zaefarian, G., & Cartwright, S. (2023). Improving PLS-SEM use for business marketing research. *Industrial Marketing Management, 111*, 127–142. https://doi.org/10.1016/j.indmarman.2023.03.010
 *   Rubin, D. B. (1987). *Multiple imputation for nonresponse in surveys*. John Wiley & Sons. 
 *   Stavseth, M. R., Clausen, T., & Røislien, J. (2019). How handling missing data may impact conclusions: A comparison of six different imputation methods for categorical questionnaire data. *SAGE Open Medicine, 7*, 2050312118822912. https://doi.org/10.1177/2050312118822912
