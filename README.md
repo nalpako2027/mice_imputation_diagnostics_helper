@@ -282,11 +282,11 @@ See `requirements.txt` for the full dependency list. To run the notebook you als
 mice_imputation_diagnostics_helper/
 ├── README.md                    # This file
 ├── LICENSE                      # MIT License
+├── Executive_Summary
 ├── requirements.txt             # Dependency list
 ├── mice_diagnostics.py          # mice_and_diagnostics() implementation
-├── notebooks/
-│   └── mice_imputation_diagnostics_helper.ipynb  
-└── images    # Figures used in the README
+├── mice_imputation_diagnostics_helper.ipynb 
+└── /images    # Folder with figures used in the README
 ```
 
 
@@ -296,7 +296,6 @@ mice_imputation_diagnostics_helper/
 
 - **MAR assumption.** The engine assumes the missing data pattern is at least Missing at Random. Evaluate the missingness mechanism before running the package.
 - **Weights are not in the imputation model.** Survey weights are used only for the before/after margins (see the design-weight caveat above).
-- **Complex-survey variance estimation.** **[UPDATE: state clearly whether the pooled variances account for the JRR replicate-weight structure or are simple Rubin's Rules quantities, and what users should do for design-based standard errors.]**
 - **Logical inconsistencies.** MICE can introduce technical problems (such as circular dependence or unimputed cells) and illogical or impossible combinations of values (such as a pregnant father). See van Buuren and Groothuis-Oudshoorn (2011, p. 6) for scenarios. As a precaution, run data-quality checks with logical assertions based on the theoretical framework of your research.
 - **Data preparation.** Make sure the raw data matrix is completely cleaned and checked before running the package.
 
