@@ -299,6 +299,12 @@ mice_imputation_diagnostics_helper/
 - **Logical inconsistencies.** MICE can introduce technical problems (such as circular dependence or unimputed cells) and illogical or impossible combinations of values (such as a pregnant father). See van Buuren and Groothuis-Oudshoorn (2011, p. 6) for scenarios. As a precaution, run data-quality checks with logical assertions based on the theoretical framework of your research.
 - **Data preparation.** Make sure the raw data matrix is completely cleaned and checked before running the package.
 
+
+- **Cluster-level variables are imputed per student.** The function treats every row as an independent unit. Variables that are constant within a cluster (here the school-questionnaire scales `mathshortage` and `schemphsuccess`) can therefore receive different imputed values for students in the same school, and their between-imputation variance is understated. In the TIMSS 2023-L example, 5 whole schools are missing `schemphsuccess_2023`, and student-level PMM gave each of them 9–10 different values. The imputed values for this variable should be treated as illustrative.
+  *Recommendation:* impute such variables on a school-level table (one row per school), merge the completed values back to the students, and then impute the student-level variables. This two-stage workflow is not implemented in the package.
+- **Pooled diagnostics assume simple random sampling.** RVI, FMI and the recommended M are computed from the variance of the unweighted mean (s²/N). They ignore survey weights and clustering, so they are imputation-quality checks, not design-consistent standard errors.
+
+
 ### Further recommendations
 
 
