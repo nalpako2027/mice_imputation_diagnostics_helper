@@ -15,7 +15,7 @@ A from-scratch, `scikit-learn`-only implementation of Multiple Imputation by Cha
 
 ### Why: the case for principled imputation
 
-In corporate data teams and academic research alike, listwise deletion (dropping every row that has at least one missing value in the variables used) remains the most common default for incomplete data (Guenther et al., 2023; Stavseth et al., 2019). Guenther et al. (2023) found that, since 2017, 33.1% of data analysts in business marketing research used listwise deletion and only 0.8% used imputation. Listwise deletion is quick and simple, but it puts internal, external and statistical conclusion validity at risk:  
+In corporate data teams and academic research alike, listwise deletion (dropping every row that has at least one missing value in the variables used) remains the most common default for incomplete data (Guenther et al., 2023; Stavseth et al., 2019). Guenther et al. (2023) found that, since 2017, 33.1% of data analysts in business marketing research used listwise deletion and only 0.8% used imputation. Listwise deletion is quick and simple, but it may put internal, external and statistical conclusion validity at risk:  
 
 - **Lost statistical power and signal.** Dropping rows removes valuable data and can shrink the sample substantially. If a customer skips one optional profile question, listwise deletion removes their entire purchase and behavioral history from the model; in a survey, a student who skips one item loses their whole record.
 - **Selection bias.** Data are seldom missing completely at random. If particular groups (e.g., lower-income customers, historically underrepresented groups, specific regions) skip questionnaire items more often, listwise deletion **without a valid theoretical and methodological rationale** systematically removes those groups, and the resulting models reflect only respondents who complete every item. This reduces generalizability of the results by failing to accurately represent reality.
@@ -282,11 +282,11 @@ See `requirements.txt` for the full dependency list. To run the notebook you als
 mice_imputation_diagnostics_helper/
 ├── README.md                    # This file
 ├── LICENSE                      # MIT License
+├── Executive_Summary
 ├── requirements.txt             # Dependency list
 ├── mice_diagnostics.py          # mice_and_diagnostics() implementation
-├── notebooks/
-│   └── mice_imputation_diagnostics_helper.ipynb  
-└── images    # Figures used in the README
+├── mice_imputation_diagnostics_helper.ipynb 
+└── /images    # Folder with figures used in the README
 ```
 
 
@@ -296,9 +296,14 @@ mice_imputation_diagnostics_helper/
 
 - **MAR assumption.** The engine assumes the missing data pattern is at least Missing at Random. Evaluate the missingness mechanism before running the package.
 - **Weights are not in the imputation model.** Survey weights are used only for the before/after margins (see the design-weight caveat above).
-- **Complex-survey variance estimation.** **[UPDATE: state clearly whether the pooled variances account for the JRR replicate-weight structure or are simple Rubin's Rules quantities, and what users should do for design-based standard errors.]**
 - **Logical inconsistencies.** MICE can introduce technical problems (such as circular dependence or unimputed cells) and illogical or impossible combinations of values (such as a pregnant father). See van Buuren and Groothuis-Oudshoorn (2011, p. 6) for scenarios. As a precaution, run data-quality checks with logical assertions based on the theoretical framework of your research.
 - **Data preparation.** Make sure the raw data matrix is completely cleaned and checked before running the package.
+
+
+- **Cluster-level variables are imputed per student.** The function treats every row as an independent unit. Variables that are constant within a cluster (here the school-questionnaire scales `mathshortage` and `schemphsuccess`) can therefore receive different imputed values for students in the same school, and their between-imputation variance is understated. In the TIMSS 2023-L example, 5 whole schools are missing `schemphsuccess_2023`, and student-level PMM gave each of them 9–10 different values. The imputed values for this variable should be treated as illustrative.
+  *Recommendation:* impute such variables on a school-level table (one row per school), merge the completed values back to the students, and then impute the student-level variables. This two-stage workflow is not implemented in the package.
+- **Pooled diagnostics assume simple random sampling.** RVI, FMI and the recommended M are computed from the variance of the unweighted mean (s²/N). They ignore survey weights and clustering, so they are imputation-quality checks, not design-consistent standard errors.
+
 
 ### Further recommendations
 
