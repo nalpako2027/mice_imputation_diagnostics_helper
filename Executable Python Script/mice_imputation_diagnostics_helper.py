@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# # 📊🔍 A Diagnostics Package for Multiple Imputation by Chained Equations (using PMM)
+# 📊🔍 A Diagnostics Package for Multiple Imputation by Chained Equations (using PMM)
 
-# import libraries
+# Import libraries
 import pandas as pd
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
@@ -11,11 +11,16 @@ from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+# The versions of imported libraries
+import sys
+from importlib.metadata import version
 
-# # MICE Imputation with PMM & Diagnostics 
+
+# # MICE Imputation with PMM & Diagnostics
+
 
 def mice_and_diagnostics(df, imputed_cols, auxiliary_cols, m_datasets=10, burnin=10,
-                          knn=5, seed=1234, weight_var='TOTWGT', plot_diagnostics=True,
+                          knn=5, seed=1234, weight_var=None, plot_diagnostics=True,
                           label="Dataset", predictor_map=None):
     """
     MICE with genuine PMM (Bayesian regression + nearest-neighbor donor matching,
@@ -29,10 +34,10 @@ def mice_and_diagnostics(df, imputed_cols, auxiliary_cols, m_datasets=10, burnin
     Args:
         df (pd.DataFrame): Input DataFrame containing both the
             variables to be imputed and their predictors. 
-        imputed_cols (str): Variables with missing values to impute via
+        imputed_cols (list[str]): Variables with missing values to impute via
             MICE + PMM. Every variable here also acts as a predictor for every
             other variable in this list, unless overridden in predictor_map.
-        auxiliary_cols (str): Variables used as predictors alongside imputed_cols in 
+        auxiliary_cols (list[str]): Variables used as predictors alongside imputed_cols in 
             the chained-equations regressions. These are never themselves imputed, 
             only used to help predict the variables in imputed_cols.
         m_datasets (int): Number of independent parallel imputation chains
@@ -53,7 +58,7 @@ def mice_and_diagnostics(df, imputed_cols, auxiliary_cols, m_datasets=10, burnin
         seed (int): Seed for the root SeedSequence, spawned into m_datasets
             independent per-chain RNG streams so chains are statistically
             independent draws, as required by Rubin's combining rules.
-        weight_var (str): Name of the survey design weight column, if given. 
+        weight_var (str, optional): Name of the survey design weight column, if given. 
             Used only to compute the population-weighted statistics and inferences 
             (not incorporated into the imputation regressions themselves). To 
             weight the imputation regressions directly, beta_hat and Xt_X_inv would 
@@ -72,6 +77,11 @@ def mice_and_diagnostics(df, imputed_cols, auxiliary_cols, m_datasets=10, burnin
             falls back to "predict from every other variable in
             imputed_cols + auxiliary_cols" (the inclusive strategy).
     """
+    # === INPUT VALIDATION ===
+    if m_datasets < 2:
+        raise ValueError("m_datasets must be at least 2: Rubin's between-imputation "
+                         "variance B divides by (M - 1), so M = 1 gives no variance estimate.")
+    # ========================
 
     N = len(df)
     all_cols = imputed_cols + auxiliary_cols
@@ -99,8 +109,7 @@ def mice_and_diagnostics(df, imputed_cols, auxiliary_cols, m_datasets=10, burnin
         # chained-equations loop (FCS): Bayesian regression draw + PMM donor matching
         for iteration in range(burnin):
             for target in imputed_cols:
-                predictors = predictor_map.get(target, [c for c in all_cols if c != target]) \
-                    if predictor_map else [c for c in all_cols if c != target]
+                predictors = predictor_map.get(target, [c for c in all_cols if c != target]) if predictor_map else [c for c in all_cols if c != target]
                 obs_mask = ~missing_masks[target]
                 mis_mask = missing_masks[target]
 
@@ -143,15 +152,14 @@ def mice_and_diagnostics(df, imputed_cols, auxiliary_cols, m_datasets=10, burnin
                 distances, indices = nn.kneighbors(pred_mis)
                 donor_choices = np.array([rng.choice(idx) for idx in indices])
 
-                observed_indices = current_df.index[obs_mask]
-                chosen_real_indices = observed_indices[donor_choices]
-                current_df.loc[mis_mask, target] = current_df.loc[chosen_real_indices, target].values
+                current_df.loc[mis_mask, target] = Y_obs[donor_choices]
 
                 trace_data.append({
                     'Chain': m + 1,
                     'Iteration': iteration + 1,
                     'Variable': target,
-                    'Mean': current_df[target].mean()
+                    'Mean': current_df.loc[mis_mask, target].mean(),
+                    'SD':   current_df.loc[mis_mask, target].std()
                 })
 
         imputed_list.append(current_df)
@@ -163,23 +171,22 @@ def mice_and_diagnostics(df, imputed_cols, auxiliary_cols, m_datasets=10, burnin
     # the-mean approximation under simple random sampling. It doesn't account
     # for survey weights or clustered design -- treat RVI/FMI/
     # recommended M as imputation-quality checks, not design-consistent SEs.
-    # Use calculate_weighted_means_with_se (JRR-based) for reportable SEs.
     diagnostics = {}
     for col in imputed_cols:
         means_m = np.array([df_m[col].mean() for df_m in imputed_list])
         vars_m = np.array([df_m[col].var() / N for df_m in imputed_list])
 
         Q_bar = np.mean(means_m)
-        W_bar = np.mean(vars_m)
+        W_bar = np.mean(vars_m) # within-imputation variance
 
-        B = np.sum((means_m - Q_bar) ** 2) / (m_datasets - 1)
+        B = np.sum((means_m - Q_bar) ** 2) / (m_datasets - 1) # between imputation variance
         T = W_bar + (1 + (1 / m_datasets)) * B
 
         rvi = (1 + (1 / m_datasets)) * B / W_bar if W_bar > 0 else 0
         # v_m uses Rubin's (1987) large-sample df formula. This is the correct
         # choice specifically for deciding how many imputations to run --
         # von Hippel (2020) explicitly notes the small-sample version
-        # "should not be used to choose the number of imputations M" (fn. 9).
+        # "should not be used to choose the number of imputations M" (fn. 9, p. 13).
         v_m = (m_datasets - 1) * (1 + (1 / rvi)) ** 2 if rvi > 0 else 9999
         fmi = (rvi + (2 / (v_m + 3))) / (1 + rvi) if rvi > 0 else 0
         relative_efficiency = 1 / (1 + (fmi / m_datasets))
@@ -188,15 +195,20 @@ def mice_and_diagnostics(df, imputed_cols, auxiliary_cols, m_datasets=10, burnin
         # CI for the fraction of missing information (not the point estimate)
         # as a conservative input to the "how many imputations" calculation.
         # CI built on the logit scale: logit(fmi) +/- z*sqrt(2/M), citing
-        # Harel, O. (2007) in page 4.
-        logit_fmi = np.log(fmi / (1 - fmi)) if 0 < fmi < 1 else 0
+        # Harel, O. (2007), in page 4.
         se_logit = np.sqrt(2 / m_datasets)
-        ci_upper_logit = logit_fmi + 1.96 * se_logit
-        fmi_upper = 1 / (1 + np.exp(-ci_upper_logit)) if ci_upper_logit != 0 else fmi
 
-        # Quadratic rule (von Hippel 2020, eq. 1/10) targeting CV(SE)=0.05
+        # Von Hippel (2020) upper 95% CI for FMI; fmi in {0, 1} has no finite logit, so use it directly.
+        if 0 < fmi < 1:
+            logit_fmi = np.log(fmi / (1 - fmi))
+            fmi_upper = 1 / (1 + np.exp(-(logit_fmi + 1.96 * se_logit)))
+        else:
+            fmi_upper = fmi         
+
+
+        # Quadratic rule (von Hippel 2020, eq. 1 & 10) targeting CV(SE)=0.05
         gamma = fmi_upper
-        m_needed = int(np.ceil(1 + 0.5 * (gamma / 0.05) ** 2)) if gamma > 0 else m_datasets
+        m_needed = int(np.ceil(1 + 0.5 * (gamma / 0.05) ** 2)) if gamma > 0 else 1
 
         diagnostics[col] = {
             'RVI': rvi, 'FMI': fmi, 'Rel Efficiency': relative_efficiency,
@@ -207,19 +219,20 @@ def mice_and_diagnostics(df, imputed_cols, auxiliary_cols, m_datasets=10, burnin
     diagnostic_table = pd.DataFrame.from_dict(diagnostics, orient='index')
     print(diagnostic_table.to_string(float_format=lambda x: f"{x:.4f}"))
 
-    # === PLOTTING (unchanged) ===
+    # === PLOTTING ===
     if plot_diagnostics:
         print("\n[Diagnostic 1/2] Generating MCMC Convergence Trace Plots...")
         for target_var in imputed_cols:
-            plt.figure(figsize=(10, 2.5))
             var_data = trace_df[trace_df['Variable'] == target_var]
-            sns.lineplot(data=var_data, x='Iteration', y='Mean', hue='Chain',
-                         palette='tab10', linewidth=1.5, alpha=0.8, legend=False)
-            plt.title(f"MCMC Convergence History: {target_var}", fontsize=11, fontweight='bold')
-            plt.xlabel("Iteration Cycle", fontsize=9)
-            plt.ylabel("Imputed Vector Mean", fontsize=9)
-            plt.xticks(ticks=sorted(var_data['Iteration'].unique()))
-            plt.grid(True, linestyle='--', alpha=0.4)
+            fig, axes = plt.subplots(1, 2, figsize=(12, 2.8), sharex=True)
+            for ax, stat, ylab in zip(axes, ['Mean', 'SD'],
+                                      ['Mean of imputed values', 'SD of imputed values']):
+                sns.lineplot(data=var_data, x='Iteration', y=stat, hue='Chain',
+                             palette='tab10', linewidth=1.2, alpha=0.8, legend=False, ax=ax)
+                ax.set_xlabel("Iteration cycle", fontsize=9)
+                ax.set_ylabel(ylab, fontsize=9)
+                ax.grid(True, linestyle='--', alpha=0.4)
+            fig.suptitle(f"MCMC Convergence History: {target_var}", fontsize=11, fontweight='bold')
             plt.tight_layout()
             plt.show()
 
@@ -250,23 +263,23 @@ def mice_and_diagnostics(df, imputed_cols, auxiliary_cols, m_datasets=10, burnin
         for blank_idx in range(num_vars, len(axes)):
             fig.delaxes(axes[blank_idx])
 
-        plt.suptitle("Observed vs. PMM Imputed Value Distributions Across Variables",
-                     fontsize=14, fontweight='bold', y=1.01)
+        plt.suptitle("Observed vs. PMM Imputed Value Distributions Across Variables", fontsize=14, fontweight='bold', y=1.01)
         plt.tight_layout(rect=[0, 0, 1, 0.96])
         plt.show()
 
     # === BEFORE / AFTER WEIGHTED MARGINS ===
+
     print("="*20, f"{label}: BEFORE IMPUTATION SURVEY MARGINS", "="*20)
-    before_means = (df[imputed_cols].multiply(df[weight_var], axis=0).sum()) / \
-                   (df[imputed_cols].notna().multiply(df[weight_var], axis=0).sum())
+    valid = df[weight_var].notna()
+    before_means = (df.loc[valid, imputed_cols].multiply(df.loc[valid, weight_var], axis=0).sum()) / \
+               (df.loc[valid, imputed_cols].notna().multiply(df.loc[valid, weight_var], axis=0).sum())
     print(before_means.to_frame(name='Raw Weighted Mean (Observed)'), "\n" + "="*80)
 
     print("\n" + "="*20, f"{label}: AFTER IMPUTATION POOLED SURVEY MARGINS", "="*20)
-    weights_vector = df[weight_var].fillna(1.0).values
+    weights_vector = df.loc[valid, weight_var].values
     weights_sum = weights_vector.sum()
-
     after_means = pd.DataFrame([
-        (df_m[imputed_cols].multiply(weights_vector, axis=0).sum()) / weights_sum
+        (df_m.loc[valid, imputed_cols].multiply(weights_vector, axis=0).sum()) / weights_sum
         for df_m in imputed_list
     ]).mean()
 
@@ -274,66 +287,4 @@ def mice_and_diagnostics(df, imputed_cols, auxiliary_cols, m_datasets=10, burnin
 
     return imputed_list, trace_df, diagnostic_table
 
-
-# ## An Example for Performing An Imputation with Diagnostics
-
-# Multiple imputation by Chained Equations require the missing data pattern to be at
-# least missing-at-random (MAR). Data cleaning and management steps should be completed
-# before running this function. For detailed explanations, refer to van Buuren, S. (2018).
-# Flexible Imputation of Missing Data (2nd ed.). Chapman & Hall/CRC
-
-# Load the dataset (TIMSS Dataset - Sweden 8th grade data)
-sweden_df = pd.read_parquet('sweden_df.parquet')
-
-# Variables/Features
-# Specifying variables to be imputed
-imputed_variables = [
-    'ses_2023', 'ses_2024', 
-    'mathshortage_2023', 'mathshortage_2024',
-    'schemphsuccess_2023', 'schemphsuccess_2024', 
-    'digseff_2023', 'digseff_2024',
-    'stud_expect_2023', 'stud_expect_2024', 
-    'confidentmath_2023', 'confidentmath_2024',
-    'instrclarity_2023', 'instrclarity_2024'
-]
-# School-level math achievement as auxiliary variables
-sweden_df['school_math_mean23'] = sweden_df.groupby('IDSCHOOL')['math1_2023'].transform('mean')
-sweden_df['school_math_mean24'] = sweden_df.groupby('IDSCHOOL')['math1_2024'].transform('mean')
-
-# Auxiliary variables to help predict missingness
-auxiliary_vars = [
-    'math1_2023', 'math1_2024', 'school_math_mean23', 'school_math_mean24'
-]
-
-# A Pilot Imputation with 10 imputations (m_datasets=10)
-imputed_dfs_sweden, trace_dataframe, diagnostic_table = mice_and_diagnostics(
-    df=sweden_df, 
-    imputed_cols=imputed_variables, 
-    auxiliary_cols=auxiliary_vars, 
-    m_datasets=10, 
-    burnin=10,
-    plot_diagnostics=True,
-    knn=5, seed=1234, weight_var='TOTWGT',
-    label="Dataset",
-    #predictor_map=predictor_map
-)
-
-
-# **Interpretation**  
-# Recommended minimum number of imputation is 45 for digseff_2024. To be conservative, run the MICE imputation with m_datasets=45
-
-
-# Final Imputation with Recommended minimum M (m_datasets=45)
-imputed_dfs_sweden, trace_dataframe, diagnostic_table = mice_and_diagnostics(
-    df=sweden_df, 
-    imputed_cols=imputed_variables, 
-    auxiliary_cols=auxiliary_vars, 
-    m_datasets=45, 
-    burnin=10,
-    plot_diagnostics=True,
-    knn=5, seed=1234, weight_var='TOTWGT',
-    label="Dataset",
-    #predictor_map=predictor_map
-)
-
-# References for cited sources are given in the notebook.
+# Note: The application of this function on a real dataset is provided within the jupyter notebook that is shared on Github.
