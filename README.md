@@ -5,7 +5,6 @@
 ![Version](https://img.shields.io/badge/Version-1.0.0-orange) 
 
 # 📊🔍 A Diagnostics Package for Multiple Imputation by Chained Equations (using PMM)
-# Under Construction!!!
 
 ## 1. 📝 Summary
 A from-scratch, `scikit-learn`-only implementation of Multiple Imputation by Chained Equations (MICE) with Predictive Mean Matching (PMM) based on *K*-nearest-neighbour (*K*-NN) donor selection, built for complex-survey data such as TIMSS and PISA. It runs the imputations and returns Rubin's (1987) pooling diagnostics (RVI, FMI, RE) and Von Hippel's (2020) recommended number of imputations, so that you can verify that your imputed results are stable and reproducible.
